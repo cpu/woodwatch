@@ -1,5 +1,5 @@
-// Package woodwatch provides things
-// TODO(@cpu): Write this package comment
+// Package woodwatch provides a server for monitoring peers by ICMP echo request
+// keepalives.
 package woodwatch
 
 import (
@@ -9,142 +9,113 @@ import (
 	"net"
 	"time"
 
+	"github.com/cpu/woodwatch/internal/webhook"
+
 	"golang.org/x/net/icmp"
-
-	"github.com/looplab/fsm"
-)
-
-const (
-	// monitorCycle determines how often the server checks each source's last seen
-	// field.
-	monitorCycle = time.Second * 2
-
-	// sourceTimeout is the max duration between ICMP messages before a source is
-	// considered offline.
-	sourceTimeout = time.Second * 5
 )
 
 var (
-	// ServerAlreadyListeningErr is returned from Server.Listen when the Server is
+	// ErrServerAlreadyListening is returned from Server.Listen when the Server is
 	// already listening.
-	ServerAlreadyListeningErr = errors.New("Listen() can only be called once")
-	// ServerNotListeningErr is returned from Server.Close when the Server is not
+	ErrServerAlreadyListening = errors.New("Listen() can only be called once")
+	// ErrServerNotListening is returned from Server.Close when the Server is not
 	// listening.
-	ServerNotListeningErr = errors.New("Close() must be called after Listen()")
-	// EmptyListenAddressErr is returned from Server.Listen when the Server's
+	ErrServerNotListening = errors.New("Close() must be called after Listen()")
+	// ErrEmptyListenAddress is returned from Server.Listen when the Server's
 	// listen address is empty.
-	EmptyListenAddressErr = errors.New("Listen address must not be empty")
-	// TooFewSourcesErr is returned from NewServer when there aren't enough
-	// sources provided.
-	TooFewSourcesErr = errors.New("One or more Sources must be configured")
+	ErrEmptyListenAddress = errors.New("Listen address must not be empty")
+	// ErrTooFewPeers is returned from NewServer when there aren't enough
+	// peers provided.
+	ErrTooFewPeers = errors.New("One or more Peers must be configured")
 )
 
-const (
-	// StateUnknown represents a Source that hasn't been seen yet.
-	StateUnknown string = "Unknown"
-	// StateOffline represents a Source that hasn't been seen within the timeout
-	// duration.
-	StateOffline string = "Offline"
-	// StateOnline represents a Source that is online and has been seen within the
-	// timeout duration.
-	StateOnline string = "Online"
-)
-
-// Source is a thing
-// TODO(@cpu): Write the Source struct comment
-type Source struct {
-	// Name is the friendly display name for the Source. E.g. "Comcast", "Cocego".
-	Name string
-	// Network is the IP network that the given Source will send ICMP messages from.
-	Network *net.IPNet
-
-	// stateMachine implements state transitions for the source.
-	stateMachine *fsm.FSM
-
-	// lastSeen is the time the Source last sent an ICMP message.
-	lastSeen time.Time
-}
-
-// NewSource does a thing.
-// TODO(@cpu): Write the NewSource func comment.
-func NewSource(name string, network string) (*Source, error) {
-	_, parsedNetwork, err := net.ParseCIDR(network)
-	if err != nil {
-		return nil, err
-	}
-	fsm := fsm.NewFSM(
-		StateUnknown,
-		fsm.Events{
-			{
-				Name: "ping",
-				Src:  []string{StateUnknown, StateOnline, StateOffline},
-				Dst:  StateOnline,
-			},
-			{
-				Name: "timeout",
-				Src:  []string{StateUnknown, StateOnline, StateOffline},
-				Dst:  StateOffline,
-			},
-		},
-		fsm.Callbacks{},
-	)
-	return &Source{
-		Name:         name,
-		Network:      parsedNetwork,
-		stateMachine: fsm,
-	}, nil
-}
-
-// Server is a thing.
-// TODO(@cpu): Write the Server struct comment
+// Server is a struct for monitoring peers for keepalives received on
+// a icmp.PacketConn.
 type Server struct {
 	// log is the Server's log.Logger instance.
 	log *log.Logger
+	// Verbose indicates whether all state change events should be logged and
+	// dispatched or just notable ones.
+	verbose bool
 	// listenAddress is the address used with icmp.ListenPacket in Listen to
 	// create conn.
 	listenAddress string
-	// conn is created in Listen with icmp.ListenPacket.
+	// conn is created in Listen with icmp.ListenPacket. ICMP messages are read
+	// from conn.
 	conn *icmp.PacketConn
-	// sources is a list of configured traffic sources.
-	sources []*Source
+	// peers is a list of configured peers.
+	peers []*peer
 	// closeChan is used to signal a close to the monitoring goroutine.
 	closeChan chan bool
+	// monitorCycle is the duration of time between checking if peers have timed out.
+	monitorCycle time.Duration
+	// peerTimeout is the duration of time the peer must have sent an ICMP echo
+	// request within to be considered seen recently enough during a monitor
+	// cycle.
+	peerTimeout time.Duration
 }
 
-// NewServer creates a thing
-// TODO(@cpu): Write the NewServer func comment
-func NewServer(log *log.Logger, addr string, sources []*Source) (*Server, error) {
+// NewServer constructs a woodwatch.Server for the given arguments and config or
+// returns an error. The Server will not be running and listening for ICMP
+// messages until it is explicitly started by calling Server.Listen()
+func NewServer(
+	log *log.Logger,
+	verbose bool,
+	addr string,
+	c Config) (*Server, error) {
 	if addr == "" {
-		return nil, EmptyListenAddressErr
+		return nil, ErrEmptyListenAddress
 	}
-	if len(sources) == 0 {
-		return nil, TooFewSourcesErr
+	if err := c.Valid(); err != nil {
+		return nil, err
 	}
+
+	// Parse the monitor cycle and timeout durations.
+	// NOTE(@cpu): It's safe to throw away potential error returns from
+	// `time.ParseDuration` here because we checked c.Valid() and it verifies the
+	// duration validities.
+	monitorCycleDuration, _ := time.ParseDuration(c.MonitorCycle)
+	peerTimeoutDuration, _ := time.ParseDuration(c.PeerTimeout)
+
+	// Build peers from the PeerConfigs
+	peers, err := loadPeers(c)
+	if err != nil {
+		return nil, err
+	}
+
+	// Log each of the peers and the initial state
+	for _, p := range peers {
+		log.Print(p)
+	}
+
 	return &Server{
 		log:           log,
+		verbose:       verbose,
 		listenAddress: addr,
-		sources:       sources,
+		peers:         peers,
 		closeChan:     make(chan bool, 1),
+		monitorCycle:  monitorCycleDuration,
+		peerTimeout:   peerTimeoutDuration,
 	}, nil
 }
 
 // Listen opens a PacketConn for the Server's listen address that will listen
 // for ICMP packets. If Listen is called on a Server with an empty listen
-// address it will return EmptyListeningAddressErr. If Listen is called more
-// than once it will return ServerAlreadyListeningErr for all calls after the
+// address it will return ErrEmptyListeningAddress. If Listen is called more
+// than once it will return ErrServerAlreadyListening for all calls after the
 // first.
 func (s *Server) Listen() error {
 	// Don't listen if there is no listen address
 	if s.listenAddress == "" {
-		return EmptyListenAddressErr
+		return ErrEmptyListenAddress
 	}
 	// Don't listen again if the server is already listening.
 	if s.conn != nil {
-		return ServerAlreadyListeningErr
+		return ErrServerAlreadyListening
 	}
 
-	// Start monitoring the last seen date of the traffic sources.
-	go s.checkSourcesTicker()
+	// Start monitoring the last seen date of the peers.
+	go s.checkPeersTicker()
 
 	// Listen for packets on the server listenAddress
 	var err error
@@ -156,41 +127,72 @@ func (s *Server) Listen() error {
 	return s.readPacket()
 }
 
-// checkSourcesTicker will call checkSource for each of the Server's configured
-// Sources once per monitorCycle until the Server's Close function is called.
-func (s *Server) checkSourcesTicker() {
-	ticker := time.NewTicker(monitorCycle)
+// checkPeersTicker will call checkPeer for each of the Server's configured
+// peers once per monitorCycle until the Server's Close function is called.
+func (s *Server) checkPeersTicker() {
+	ticker := time.NewTicker(s.monitorCycle)
 	for {
 		select {
-		case _ = <-s.closeChan:
+		case <-s.closeChan:
 			s.log.Printf("stopping monitoring\n")
 			return
-		case _ = <-ticker.C:
-			for _, src := range s.sources {
-				s.checkSource(src)
+		case <-ticker.C:
+			for _, src := range s.peers {
+				s.checkPeer(src)
 			}
 		}
 	}
 }
 
-// checkSource checks if the given Source's last seen date is within an
+// checkPeer checks if the given peer's last seen date is within an
 // acceptable time range.
-func (s *Server) checkSource(src *Source) {
-	// if there is no src or statemachine return early
-	if src == nil || src.stateMachine == nil {
+func (s *Server) checkPeer(p *peer) {
+	// defensive check - shouldn't happen.
+	if p == nil {
 		return
 	}
+	p.lastSeenMu.RLock()
+	defer p.lastSeenMu.RUnlock()
 
-	fmt.Printf("Source %q (last seen %q) is %q\n",
-		src.Name, src.lastSeen, src.stateMachine.Current())
-
-	// if the source has been seen less than sourceTimeout ago return early.
-	now := time.Now()
-	if now.Sub(src.lastSeen) < sourceTimeout {
-		return
+	// Check if the peer has been seen within the peerTimeout
+	var seen bool
+	if time.Since(p.lastSeen) < s.peerTimeout {
+		seen = true
 	}
 
-	src.stateMachine.Event("timeout")
+	// Call the heartbeat function of the peer's current state with the
+	// observation to produce a new state.
+	oldState := p.state.String()
+	var noteworthy bool
+	p.state, noteworthy = p.state.Heartbeat(seen)
+	newState := p.state.String()
+
+	prettyLastSeen := p.lastSeen.Format("2006-01-02 03:04:05 PM -0700")
+	event := webhook.Event{
+		Timestamp: time.Now(),
+		LastSeen:  p.lastSeen,
+		Title:     fmt.Sprintf("Peer %s is %s", p.Name, newState),
+		Text: fmt.Sprintf("%s (last seen %s) was previously %s and is now %s",
+			p.Name, prettyLastSeen, oldState, newState),
+		NewState:  newState,
+		PrevState: oldState,
+	}
+
+	dispatch := func() {
+		if p.Webhook != nil {
+			go p.Webhook.Dispatch(event)
+		}
+		s.log.Print(event.Title)
+	}
+
+	if noteworthy {
+		// If the event was noteworthy dispatch it.
+		dispatch()
+	} else if oldState != newState && s.verbose {
+		// If the event was a state change and we're being verbose then dispatch it
+		// even though it isn't noteworthy.
+		dispatch()
+	}
 }
 
 // readPacket will read an ICMP packet from the server's PacketConn connection
@@ -205,46 +207,45 @@ func (s *Server) readPacket() error {
 		if err != nil {
 			return err
 		}
-		s.updateSource(srcIP)
+		s.updatePeer(srcIP)
 	}
-	return nil
 }
 
-// updateSource iterates the Server's configured sources checking if any of the
-// source networks contain the given address. The first matching source will
+// updatePeer iterates the Server's configured peers checking if any of the
+// peer networks contain the given address. The first matching peer will
 // have its last seen field set to the current time.
-func (s *Server) updateSource(addr net.Addr) {
+func (s *Server) updatePeer(addr fmt.Stringer) {
 	parsedIP := net.ParseIP(addr.String())
 
-	var matchedSource *Source
-	for _, src := range s.sources {
-		// TODO(@cpu): Add a debug flag to control printing the following commented
-		// out debug Printf.
-		/*
-			fmt.Printf("Source %q Network %q contains %q - %v\n",
-				src.Name, src.Network, parsedIP, src.Network.Contains(parsedIP))
-		*/
-		if src.Network.Contains(parsedIP) {
-			matchedSource = src
+	var matchedPeer *peer
+	for _, p := range s.peers {
+		if p.Network.Contains(parsedIP) {
+			matchedPeer = p
 			break
 		}
 	}
 
-	if matchedSource == nil {
-		s.log.Printf("no configured source matched %q", addr)
-	} else {
-		s.log.Printf("ip %q updated lastseen for %s\n", addr, matchedSource.Name)
-		matchedSource.lastSeen = time.Now()
-		matchedSource.stateMachine.Event("ping")
+	if matchedPeer == nil {
+		if s.verbose {
+			s.log.Printf("no configured peer matched %q", addr)
+		}
+		return
 	}
+
+	if s.verbose {
+		s.log.Printf("ip %q updated lastseen for %s\n", addr, matchedPeer.Name)
+	}
+	matchedPeer.lastSeenMu.Lock()
+	defer matchedPeer.lastSeenMu.Unlock()
+	matchedPeer.lastSeen = time.Now()
 }
 
 // Close closes the Server's PacketConn and stops listening for ICMP messages on
 // the Server's listen address. If Close is called before Listen it will return
-// ServerNotListeningError.
+// ErrServerNotListening.
 func (s *Server) Close() error {
 	if s.conn == nil {
-		return ServerNotListeningErr
+		return ErrServerNotListening
 	}
 	// Signal the monitoring go routine to close
 	s.closeChan <- true

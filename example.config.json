@@ -1,0 +1,16 @@
+{
+  "UpThreshold": 3,
+  "DownThreshold": 3,
+  "MonitorCycle": "2s",
+  "PeerTimeout": "4s",
+  "Webhook": "http://localhost:9090/woodwatch-hook",
+  "Peers": [
+    {
+      "Name": "LAN",
+      "Network": "192.168.2.0/24",
+      "UpThreshold": 5,
+      "DownThreshold": 5,
+      "Webhook": "http://localhost:9090/custom-lan-hook"
+    }
+  ]
+}

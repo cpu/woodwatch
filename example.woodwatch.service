@@ -1,0 +1,13 @@
+[Unit]
+Description=woodwatch ICMP monitor
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=woodwatch
+Group=woodwatch
+Type=simple
+ExecStart=/usr/local/bin/woodwatch --config /etc/woodwatch/config.json
+
+[Install]
+WantedBy=multi-user.target

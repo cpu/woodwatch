@@ -14,7 +14,7 @@ import (
 var (
 	// quitSignals are the signals that can be used to tell the woodwatch binary to
 	// shut down cleanly.
-	quitSignals []os.Signal = []os.Signal{
+	quitSignals = []os.Signal{
 		syscall.SIGHUP,
 		syscall.SIGINT,
 		syscall.SIGTERM,
@@ -29,37 +29,36 @@ var (
 
 // main runs the woodwatch program.
 func main() {
+	configFile := flag.String("config", "", "path to a woodwatch JSON config file")
+	verbose := flag.Bool("verbose", false, "verbose output")
+	flag.Parse()
+
 	logger := log.New(os.Stdout, "woodwatch ", log.LstdFlags)
-
-	// Configure sources
-	// TODO(@cpu): Read sources from config
-	var sources []*woodwatch.Source
-
-	mustSource := func(name string, network string) *woodwatch.Source {
-		source, err := woodwatch.NewSource(name, network)
-		if err != nil {
-			logger.Fatalf("error creating source %q with network %q: %v\n",
-				name, network, err)
-		}
-		return source
+	if *configFile == "" {
+		logger.Fatal("you must specify a -config file")
 	}
 
-	sources = append(sources, mustSource("Groupe Acces", "24.226.129.0/24"))
-	sources = append(sources, mustSource("Explornet", "208.114.129.0/24"))
-	sources = append(sources, mustSource("WoodWeb", "192.168.2.0/24"))
+	// Load a Config instance from disk
+	c, err := woodwatch.LoadConfigFile(*configFile)
+	if err != nil {
+		logger.Fatalf("error loading config %q: %v\n", *configFile, err)
+	}
 
-	// Create a server
-	server, err := woodwatch.NewServer(logger, *listenAddress, sources)
+	// Create the woodwatch server
+	server, err := woodwatch.NewServer(
+		logger,
+		*verbose,
+		*listenAddress,
+		c)
 	if err != nil {
 		logger.Fatalf("error creating server: %v\n", err)
 	}
-	logger.Println("starting")
 
-	// Listen for the quitSignals. When one is received close the server.
+	// Listen for quitSignals. When one is received close the server.
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, quitSignals...)
 	go func() {
-		_ = <-sigChan
+		<-sigChan
 		logger.Println("ending")
 		if err := server.Close(); err != nil {
 			logger.Fatalf("err closing: %v\n", err)
