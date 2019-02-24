@@ -30,7 +30,7 @@ var (
 // main runs the woodwatch program.
 func main() {
 	configFile := flag.String("config", "", "path to a woodwatch JSON config file")
-	verbose := flag.Bool("verbose", false, "verbose output")
+	verbose := flag.Bool("verbose", false, "verbose output and webhook dispatch")
 	flag.Parse()
 
 	logger := log.New(os.Stdout, "woodwatch ", log.LstdFlags)
