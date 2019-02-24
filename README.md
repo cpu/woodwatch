@@ -243,7 +243,7 @@ Configure a webhook URL using the `http-echo-server` by setting the URL in your
 config file:
 
        ...
-       "UpHook": "http://localhost:9090/woodwatch-up-hook",
+       "Hook": "http://localhost:9090/woodwatch-up-hook",
        ...
 
 ## Making a snapshot release
