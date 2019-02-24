@@ -13,8 +13,6 @@ const (
 // changing state. All PeerStates can represent their current state as
 // a string. State changes can be marked as notable or not notable by returning
 // a bool from the heartbeat function alongside the new state.
-//
-// TODO(@cpu): Make this an internal export
 type PeerState interface {
 	// Heartbeat is called every check cycle to indicate if the peer was seen
 	// recently or not. A Heartbeat function should return the new PeerState
@@ -31,7 +29,6 @@ type PeerState interface {
 // provided thresholds. The returned PeerState represents a down connection that
 // must receive downThreshold seen events to transition to up.
 //
-// TODO(@cpu): Make this an internal export
 // TODO(@cpu): Describe lifecycle based on upThreshold/downThreshold
 func NewPeer(upThreshold, downThreshold uint) PeerState {
 	// NOTE(@cpu): By default we start in down state
