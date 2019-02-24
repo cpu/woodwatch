@@ -1,4 +1,4 @@
-// package states provides peer state tracking.
+// Package states provides peer state tracking.
 package states
 
 import "fmt"
