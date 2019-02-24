@@ -30,7 +30,7 @@ can be configured globally and also per-monitored-peer.
    download the `.tar.gz` for your architecture (most probably
    `Linux_x86_64.tar.gz`).
 
-       wget https://github.com/cpu/woodwatch/releases/download/v0.0.1/woowdwatch_v0.0.1_Linux_x86_64.tar.gz
+       wget https://github.com/cpu/woodwatch/releases/download/v0.0.1/woodwatch_0.0.1_Linux_x86_64.tar.gz
 
 1. Extract the release archive and `cd` into it.
 
