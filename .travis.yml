@@ -18,6 +18,15 @@ install:
   - go install -mod=vendor -v -race ./...
 
 script:
+  # This `go mod download` is a hack...
+  # Without it there seem to be occasional golangci-lint flakes of the form:
+  #   ERRO Running error: context loading failed: failed to load program with go/packages: 
+  #   go [list -e -json -compiled -test=true -export=false -deps=true -find=false -- ./...]: 
+  #   exit status 1: go: golang.org/x/net@v0.0.0-20190213061140-3a22650c66bd: 
+  #   git init --bare in ...
+  # error: could not write config file ...: No such file or directory
+  # go: error loading module requirements 
+  - go mod download
   # Vet Go source code using the linter config (see .golang-ci.yml)
   - golangci-lint run
   # Run project unit tests (with the race detector enabled and atomic coverage
