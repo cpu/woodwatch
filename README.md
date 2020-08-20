@@ -196,14 +196,14 @@ Accept-Encoding: gzip
 
 # Development
 
-`woodwatch` is built to support Go 1.11.x and uses
-[Go 1.11 modules](https://github.com/golang/go/wiki/Modules) and [vendored
+`woodwatch` is built with Go 1.15.x and uses
+[modules](https://github.com/golang/go/wiki/Modules) and [vendored
 dependencies](https://github.com/golang/go/wiki/Modules#how-do-i-use-vendoring-with-modules-is-vendoring-going-away).
 Presently the only dependency outside of the Go stdlib is
 [`x/net/`](https://golang.org/x/net/). Releases are built and published with
 [GoReleaser](https://goreleaser.com/).
 
-Presently `woodwatch` supports Linux and the `x86_64`, `arm64`, `armv7` and
+`woodwatch` supports Linux and the `x86_64`, `arm64`, `armv7` and
 `arm6` architectures. Woodwatch does not support other OSes at this time
 because:
 

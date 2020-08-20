@@ -1,6 +1,7 @@
 package woodwatch
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -49,33 +50,33 @@ func TestConfigValid(t *testing.T) {
 		},
 	}
 	testCases := []struct {
-		Name                 string
-		Peers                []PeerConfig
-		MonitorCycle         string
-		PeerTimeout          string
-		ExpectedErrorMessage string
+		Name                       string
+		Peers                      []PeerConfig
+		MonitorCycle               string
+		PeerTimeout                string
+		ExpectedErrorMessagePrefix string
 	}{
 		{
-			Name:                 "No peers",
-			ExpectedErrorMessage: ErrTooFewPeers.Error(),
+			Name:                       "No peers",
+			ExpectedErrorMessagePrefix: ErrTooFewPeers.Error(),
 		},
 		{
-			Name:                 "Invalid peer",
-			Peers:                []PeerConfig{{}},
-			ExpectedErrorMessage: ErrNoPeerName.Error(),
+			Name:                       "Invalid peer",
+			Peers:                      []PeerConfig{{}},
+			ExpectedErrorMessagePrefix: ErrNoPeerName.Error(),
 		},
 		{
-			Name:                 "Invalid monitor cycle",
-			Peers:                validPeers,
-			MonitorCycle:         "aaaa",
-			ExpectedErrorMessage: "time: invalid duration aaaa",
+			Name:                       "Invalid monitor cycle",
+			Peers:                      validPeers,
+			MonitorCycle:               "aaaa",
+			ExpectedErrorMessagePrefix: "time: invalid duration",
 		},
 		{
-			Name:                 "Invalid peer timeout",
-			Peers:                validPeers,
-			MonitorCycle:         "1m",
-			PeerTimeout:          "aaaa",
-			ExpectedErrorMessage: "time: invalid duration aaaa",
+			Name:                       "Invalid peer timeout",
+			Peers:                      validPeers,
+			MonitorCycle:               "1m",
+			PeerTimeout:                "aaaa",
+			ExpectedErrorMessagePrefix: "time: invalid duration",
 		},
 		{
 			Name:         "Valid config",
@@ -92,13 +93,15 @@ func TestConfigValid(t *testing.T) {
 				MonitorCycle: tc.MonitorCycle,
 				PeerTimeout:  tc.PeerTimeout,
 			}
-			if err := c.Valid(); err != nil && tc.ExpectedErrorMessage == "" {
+			if err := c.Valid(); err != nil && tc.ExpectedErrorMessagePrefix == "" {
 				t.Errorf("expected Valid() to return nil err, got %v", err)
-			} else if err == nil && tc.ExpectedErrorMessage != "" {
-				t.Errorf("expected Valid() to return %q got nil", tc.ExpectedErrorMessage)
-			} else if err != nil && err.Error() != tc.ExpectedErrorMessage {
-				t.Errorf("expected Valid() to return %q, got %v",
-					tc.ExpectedErrorMessage, err)
+			} else if err == nil && tc.ExpectedErrorMessagePrefix != "" {
+				t.Errorf("expected Valid() to return error starting with %q got nil",
+					tc.ExpectedErrorMessagePrefix)
+			} else if err != nil &&
+				!strings.HasPrefix(err.Error(), tc.ExpectedErrorMessagePrefix) {
+				t.Errorf("expected Valid() to return error starting with %q, got %v",
+					tc.ExpectedErrorMessagePrefix, err)
 			}
 		})
 	}
