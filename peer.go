@@ -54,6 +54,7 @@ func newPeer(
 	if err != nil {
 		return nil, err
 	}
+
 	return &peer{
 		Name:          name,
 		Network:       parsedNetwork,

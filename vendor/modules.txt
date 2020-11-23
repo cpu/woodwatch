@@ -1,8 +1,0 @@
-# golang.org/x/net v0.0.0-20190213061140-3a22650c66bd
-## explicit
-golang.org/x/net/bpf
-golang.org/x/net/icmp
-golang.org/x/net/internal/iana
-golang.org/x/net/internal/socket
-golang.org/x/net/ipv4
-golang.org/x/net/ipv6

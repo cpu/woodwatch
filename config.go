@@ -46,6 +46,7 @@ func (pc PeerConfig) Valid() error {
 	if pc.Network == "" {
 		return ErrNoPeerNetwork
 	}
+
 	return nil
 }
 
@@ -95,6 +96,7 @@ func (c Config) Valid() error {
 	if _, err := time.ParseDuration(c.PeerTimeout); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -104,6 +106,7 @@ func LoadConfig(data []byte) (Config, error) {
 	if err := json.Unmarshal(data, &c); err != nil {
 		return c, err
 	}
+
 	return c, nil
 }
 
@@ -115,5 +118,6 @@ func LoadConfigFile(filename string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+
 	return LoadConfig(data)
 }

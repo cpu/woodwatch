@@ -108,7 +108,7 @@ func TestConfigValid(t *testing.T) {
 }
 
 func TestLoadConfig(t *testing.T) {
-	var exampleConfig = `
+	exampleConfig := `
 	{
 		"UpThreshold": 10,
 		"DownThreshold": 10,

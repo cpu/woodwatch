@@ -29,7 +29,7 @@ type PeerState interface {
 // provided thresholds. The returned PeerState represents a down connection that
 // must receive downThreshold seen events to transition to up.
 //
-// TODO(@cpu): Describe lifecycle based on upThreshold/downThreshold
+// TODO(@cpu): Describe lifecycle based on upThreshold/downThreshold.
 func NewPeer(upThreshold, downThreshold uint) PeerState {
 	// NOTE(@cpu): By default we start in down state
 	return downState{
@@ -65,6 +65,7 @@ func (s upState) Heartbeat(seen bool) (PeerState, bool) {
 	if !seen {
 		return maybeDownState(s.limits), false
 	}
+
 	return s, false
 }
 
@@ -87,6 +88,7 @@ func (s downState) Heartbeat(seen bool) (PeerState, bool) {
 	if seen {
 		return maybeUpState(s.limits), false
 	}
+
 	return s, false
 }
 
@@ -133,6 +135,7 @@ func (s maybeState) Heartbeat(seen bool) (PeerState, bool) {
 	if s.count >= s.threshold {
 		return s.nextState, true
 	}
+
 	return s, false
 }
 

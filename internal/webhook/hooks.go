@@ -4,6 +4,7 @@ package webhook
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 )
 
 var (
+	defaultTimeout = time.Second * 30
+
 	// ErrEmptyEventTitle is returned from Hook.Dispatch when the provided Event
 	// has no title.
 	ErrEmptyEventTitle = errors.New("Event Title must not be empty")
@@ -58,6 +61,7 @@ func (e Event) Valid() error {
 	if e.PrevState == "" {
 		return ErrEmptyPrevState
 	}
+
 	return nil
 }
 
@@ -76,7 +80,10 @@ func (h Hook) Dispatch(e Event) {
 		return
 	}
 
-	req, err := http.NewRequest("POST", string(h), bytes.NewBuffer(eventBytes))
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", string(h), bytes.NewBuffer(eventBytes))
 	if err != nil {
 		return
 	}

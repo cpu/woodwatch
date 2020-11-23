@@ -1,9 +1,9 @@
 # woodwatch
 
-[![Build Status](https://travis-ci.com/cpu/woodwatch.svg?branch=master)](https://travis-ci.com/cpu/woodwatch)
+[![CI Status](https://github.com/cpu/woodwatch/workflows/Go/badge.svg)](https://github.com/cpu/woodwatch/actions?query=workflow%3AGo)
+[![Lint Status](https://github.com/cpu/woodwatch/workflows/golangci-lint/badge.svg)](https://github.com/cpu/woodwatch/actions?query=workflow%3Agolangci-lint)
 [![Coverage Status](https://coveralls.io/repos/github/cpu/woodwatch/badge.svg)](https://coveralls.io/github/cpu/woodwatch)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cpu/woodwatch)](https://goreportcard.com/report/github.com/cpu/woodwatch)
-[![GolangCI](https://golangci.com/badges/github.com/cpu/woodwatch.svg)](https://golangci.com/r/github.com/cpu/woodwatch)
 
 `woodwatch` is a small Go program that can be used to POST webhooks when
 peers stop sending ICMP echo requests (pings) for long enough to be considered

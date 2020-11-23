@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/cpu/woodwatch/internal/webhook"
-
 	"golang.org/x/net/icmp"
 )
 
@@ -57,7 +56,7 @@ type Server struct {
 
 // NewServer constructs a woodwatch.Server for the given arguments and config or
 // returns an error. The Server will not be running and listening for ICMP
-// messages until it is explicitly started by calling Server.Listen()
+// messages until it is explicitly started by calling Server.Listen().
 func NewServer(
 	log *log.Logger,
 	verbose bool,
@@ -124,6 +123,7 @@ func (s *Server) Listen() error {
 		return err
 	}
 	s.log.Printf("server listening on ip4:icmp:%s\n", s.listenAddress)
+
 	return s.readPacket()
 }
 
@@ -135,6 +135,7 @@ func (s *Server) checkPeersTicker() {
 		select {
 		case <-s.closeChan:
 			s.log.Printf("stopping monitoring\n")
+
 			return
 		case <-ticker.C:
 			for _, src := range s.peers {
@@ -221,6 +222,7 @@ func (s *Server) updatePeer(addr fmt.Stringer) {
 	for _, p := range s.peers {
 		if p.Network.Contains(parsedIP) {
 			matchedPeer = p
+
 			break
 		}
 	}
@@ -229,6 +231,7 @@ func (s *Server) updatePeer(addr fmt.Stringer) {
 		if s.verbose {
 			s.log.Printf("no configured peer matched %q", addr)
 		}
+
 		return
 	}
 

@@ -23,3 +23,5 @@ linters:
     - wsl
     - funlen
     - godox
+    - testpackage
+    - goerr113
